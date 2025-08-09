@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Weatherly — HTML + CSS + JS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* Reset + Base */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        color: var(--text);
+        background: linear-gradient(to bottom, var(--bg-from), var(--bg-to));
+        transition: background 400ms ease, color 200ms ease;
+      }
+      :root {
+        --bg-from: #f1f5f9; /* slate-100 */
+        --bg-to: #ffffff;   /* white */
+        --text: #0f172a;    /* slate-900 */
+        --card-bg: rgba(255,255,255,0.7);
+        --card-border: rgba(15,23,42,0.08);
+        --muted: #64748b;   /* slate-500 */
+        --accent: #10b981;  /* emerald-500 */
+        --accent-2: #fb923c;/* orange-400 */
+        --ring: rgba(16,185,129,0.35);
+        --shadow: 0 10px 25px rgba(2,6,23,0.08);
+      }
+      /* Dark overrides when theme is dark (JS toggles these variables) */
+      body.theme-dark {
+        --bg-from: #0f172a; /* slate-900 */
+        --bg-to: #1f2937;   /* slate-800 */
+        --text: #f8fafc;    /* slate-50 */
+        --card-bg: rgba(30,41,59,0.5);
+        --card-border: rgba(148,163,184,0.25);
+        --muted: #cbd5e1;   /* slate-300 */
+        --ring: rgba(148,163,184,0.35);
+        --shadow: 0 10px 25px rgba(2,6,23,0.25);
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 16px 0 8px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .brand .sun {
+        width: 24px; height: 24px; display: inline-block; border-radius: 999px;
+        background: conic-gradient(from 0deg, #f59e0b, #fcd34d, #fb923c, #f59e0b);
+        box-shadow: 0 0 20px #f59e0b66;
+      }
+      /* Controls */
+      .controls {
+        display: flex; flex-wrap: wrap; gap: 8px;
+      }
+      button, .btn {
+        appearance: none;
+        border: 1px solid var(--card-border);
+        background: #fff;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: transform 120ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+      }
+      body.theme-dark button { background: #111827; } /* darker base */
+      button:hover { transform: translateY(-1px); }
+      button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+      .btn-outline { background: transparent; }
+      .btn-active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+      .btn-ghost {
+        background: transparent; border-color: var(--card-border); color: var(--text);
+      }
+      .btn-icon { display: inline-flex; align-items: center; gap: 8px; }
+      /* Search */
+      .search-row {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .field { position: relative; }
+      .field input[type="text"] {
+        width: 100%;
+        padding: 12px 40px 12px 40px;
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.8);
+        backdrop-filter: saturate(180%) blur(6px);
+        font-size: 16px;
+        transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease, color 150ms ease;
+        color: var(--text);
+      }
+      body.theme-dark .field input[type="text"] { background: rgba(17,24,39,0.7); } /* slate-900/70 */
+      .field input::placeholder { color: #94a3b8; }
+      .field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--ring); background: #fff; }
+      body.theme-dark .field input:focus { background: #111827; }
+      .search-icon {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8;
+        font-size: 18px;
+      }
+      .clear-btn {
+        position: absolute; right: 36px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: #94a3b8;
+        font-size: 18px; padding: 0; cursor: pointer;
+      }
+      .go-btn { padding: 12px 14px; }
+      /* Suggestions */
+      .suggestions {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0; right: 0;
+        background: #fff;
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        overflow: auto;
+        z-index: 20;
+        max-height: 280px;
+        display: none;
+      }
+      body.theme-dark .suggestions { background: #0b1220; }
+      .suggestions.open { display: block; }
+      .suggestions .item {
+        display: flex; gap: 10px; align-items: center;
+        padding: 10px 12px; cursor: pointer; border-bottom: 1px solid rgba(2,6,23,0.06);
+      }
+      body.theme-dark .suggestions .item { border-bottom-color: rgba(148,163,184,0.14); }
+      .suggestions .item:last-child { border-bottom: none; }
+      .suggestions .item:hover, .suggestions .item[aria-selected="true"] {
+        background: #f1f5f9;
+      }
+      body.theme-dark .suggestions .item:hover,
+      body.theme-dark .suggestions .item[aria-selected="true"] {
+        background: #111827;
+      }
+      .loc-pin { font-size: 16px; color: #64748b; }
+      /* Card */
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .card .body { padding: 20px; }
+      .hero {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      }
+      .hero h2 { margin: 0; font-size: 22px; }
+      .muted { color: var(--muted); font-size: 14px; }
+      .hero-right {
+        font-size: 48px; font-weight: 800; letter-spacing: -0.02em;
+        display: flex; align-items: flex-end; gap: 10px;
+      }
+      .hero-right small { font-size: 20px; margin-left: 4px; }
+      .desc { color: var(--muted); margin-left: 4px; font-weight: 600; }
+      .coords { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+      .grid {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px;
+      }
+      @media (min-width: 640px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+      .stat {
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        background: rgba(255,255,255,0.65);
+        padding: 12px;
+        transition: transform 120ms ease, background 150ms ease;
+      }
+      body.theme-dark .stat { background: rgba(17,24,39,0.55); }
+      .stat:hover { transform: translateY(-1px); background: #fff; }
+      body.theme-dark .stat:hover { background: #111827; }
+      .stat .label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+      .stat .value { font-weight: 700; margin-top: 4px; }
+      /* Footer */
+      footer { text-align: center; font-size: 12px; color: var(--muted); margin: 18px 0 32px; }
+      /* Skeleton */
+      .skeleton {
+        position: relative; overflow: hidden; background: #e5e7eb; border-radius: 8px; min-height: 18px;
+      }
+      body.theme-dark .skeleton { background: #0b1220; }
+      .skeleton::after {
+        content: ""; position: absolute; inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+        animation: shimmer 1.2s infinite;
+      }
+      @keyframes shimmer { 100% { transform: translateX(100%); } }
+      /* Themes set via JS by updating CSS variables */
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="brand" aria-label="Weatherly">
+          <span class="sun" aria-hidden="true"></span>
+          <span>Weatherly</span>
+        </div>
+        <div class="controls" role="group" aria-label="Units, theme, and location">
+          <button id="btn-c" class="btn-outline" aria-pressed="true">°C</button>
+          <button id="btn-f" class="btn-outline" aria-pressed="false">°F</button>
+          <button id="btn-theme" class="btn-ghost" aria-label="Toggle theme">🌓 Auto</button>
+          <button id="btn-locate" class="btn-icon btn-ghost" aria-label="Use my location">📍 My location</button>
+        </div>
+      </header>
+
+      <main aria-live="polite">
+        <div class="search-row" style="margin-top: 10px;">
+          <div class="field" style="min-width: 0;">
+            <span class="search-icon">🔎</span>
+            <input id="search" type="text" inputmode="search" autocomplete="off" spellcheck="false"
+                   placeholder="Search city (e.g., Paris, Tokyo, Indore)"
+                   aria-label="Search for a city" />
+            <button class="clear-btn" id="btn-clear" aria-label="Clear search" title="Clear">&times;</button>
+
+            <div id="suggestions" class="suggestions" role="listbox" aria-label="Search suggestions"></div>
+          </div>
+          <button id="btn-go" class="go-btn" aria-label="Search">Go</button>
+        </div>
+
+        <section id="panel" style="margin-top: 16px;">
+          <div class="card">
+            <div class="body" id="placeholder">
+              <p class="muted">Tip: Type a city or use your location to see current weather.</p>
+            </div>
+            <div class="body" id="weather" hidden>
+              <div class="hero">
+                <div>
+                  <h2 id="loc-name">—</h2>
+                  <div class="muted" id="loc-sub">—</div>
+                </div>
+                <div class="hero-right">
+                  <span id="temp">--</span><small id="unit">°C</small>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-top: 8px;">
+                <div class="desc" id="desc">—</div>
+                <div class="coords" id="coords" title="Latitude, Longitude">🧭 <span>—</span></div>
+              </div>
+
+              <div class="grid" style="margin-top: 14px;">
+                <div class="stat">
+                  <div class="label">🌡️ Feels like</div>
+                  <div class="value" id="feels">--</div>
+                </div>
+                <div class="stat">
+                  <div class="label">💧 Humidity</div>
+                  <div class="value" id="humidity">--</div>
+                </div>
+                <div class="stat">
+                  <div class="label">🌬️ Wind</div>
+                  <div class="value" id="wind">--</div>
+                </div>
+                <div class="stat">
+                  <div class="label">🧭 Wind Dir</div>
+                  <div class="value" id="winddir">--</div>
+                </div>
+                <div class="stat">
+                  <div class="label">⚖️ Pressure</div>
+                  <div class="value" id="pressure">--</div>
+                </div>
+                <div class="stat">
+                  <div class="label">☔ Precip</div>
+                  <div class="value" id="precip">--</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="body" id="loading" hidden>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                <div style="flex:1;">
+                  <div class="skeleton" style="height: 22px; width: 40%;"></div>
+                  <div class="skeleton" style="height: 16px; width: 60%; margin-top:8px;"></div>
+                </div>
+                <div class="skeleton" style="height: 64px; width: 110px;"></div>
+              </div>
+              <div class="grid" style="margin-top: 14px;">
+                <div class="skeleton" style="height: 56px;"></div>
+                <div class="skeleton" style="height: 56px;"></div>
+                <div class="skeleton" style="height: 56px;"></div>
+                <div class="skeleton" style="height: 56px;"></div>
+                <div class="skeleton" style="height: 56px;"></div>
+                <div class="skeleton" style="height: 56px;"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer>Data by Open‑Meteo (no API key). Built with HTML + CSS + JS.</footer>
+      </main>
+    </div>
+
+    <script>
+      // State
+      let unit = 'c'; // 'c' or 'f'
+      let themeMode = localStorage.getItem('weather_theme_mode') || 'auto'; // 'auto' | 'dark' | 'light'
+      let currentCoords = null; // { lat, lon, name, subtitle, timezone }
+      let suggestions = [];
+      let highlightedIndex = -1; // for keyboard navigation
+      let searchController = null; // AbortController for geocode
+
+      // Elements
+      const elC = document.getElementById('btn-c');
+      const elF = document.getElementById('btn-f');
+      const elTheme = document.getElementById('btn-theme');
+      const elLocate = document.getElementById('btn-locate');
+      const elSearch = document.getElementById('search');
+      const elClear = document.getElementById('btn-clear');
+      const elGo = document.getElementById('btn-go');
+      const elSugg = document.getElementById('suggestions');
+
+      const elPlaceholder = document.getElementById('placeholder');
+      const elWeather = document.getElementById('weather');
+      const elLoading = document.getElementById('loading');
+
+      const elLoc = document.getElementById('loc-name');
+      const elSub = document.getElementById('loc-sub');
+      const elTemp = document.getElementById('temp');
+      const elUnit = document.getElementById('unit');
+      const elDesc = document.getElementById('desc');
+      const elCoords = document.getElementById('coords').querySelector('span');
+
+      const elFeels = document.getElementById('feels');
+      const elHumidity = document.getElementById('humidity');
+      const elWind = document.getElementById('wind');
+      const elWindDir = document.getElementById('winddir');
+      const elPressure = document.getElementById('pressure');
+      const elPrecip = document.getElementById('precip');
+
+      // Debounce utility
+      function debounce(fn, delay) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), delay);
+        };
+      }
+
+      // Weather code helpers
+      function codeToText(code) {
+        const c = Number(code);
+        if (c === 0) return "Clear sky";
+        if ([1,2].includes(c)) return "Partly cloudy";
+        if (c === 3) return "Overcast";
+        if ([45,48].includes(c)) return "Fog";
+        if ([51,53,55].includes(c)) return "Drizzle";
+        if ([56,57].includes(c)) return "Freezing drizzle";
+        if ([61,63,65].includes(c)) return "Rain";
+        if ([66,67].includes(c)) return "Freezing rain";
+        if ([71,73,75].includes(c)) return "Snow";
+        if (c === 77) return "Snow grains";
+        if ([80,81,82].includes(c)) return "Rain showers";
+        if ([85,86].includes(c)) return "Snow showers";
+        if (c === 95) return "Thunderstorm";
+        if ([96,99].includes(c)) return "Thunderstorm with hail";
+        return "—";
+      }
+
+      // Theme handling
+      function setThemeByPalette(palette) {
+        const root = document.documentElement;
+        root.style.setProperty('--bg-from', palette.from);
+        root.style.setProperty('--bg-to', palette.to);
+        root.style.setProperty('--text', palette.text);
+        const isDarkText = palette.text === '#f8fafc';
+        root.style.setProperty('--card-bg', isDarkText ? 'rgba(30,41,59,0.5)' : 'rgba(255,255,255,0.7)');
+        root.style.setProperty('--card-border', isDarkText ? 'rgba(148,163,184,0.25)' : 'rgba(15,23,42,0.08)');
+      }
+
+      function getPalette(code, isDay) {
+        // Light palettes by weather
+        const palettes = {
+          dayClear: { from: '#fde68a', to: '#a7f3d0', text: '#0f172a' }, // amber to emerald
+          night:    { from: '#0f172a', to: '#1f2937', text: '#f8fafc' }, // deep slates
+          cloudy:   { from: '#e2e8f0', to: '#f1f5f9', text: '#0f172a' },
+          rain:     { from: '#99f6e4', to: '#e2e8f0', text: '#0f172a' },
+          snow:     { from: '#f1f5f9', to: '#fecdd3', text: '#0f172a' },
+          storm:    { from: '#cbd5e1', to: '#fecaca', text: '#0f172a' },
+          default:  { from: '#f1f5f9', to: '#ffffff', text: '#0f172a' },
+        };
+        let t = palettes.default;
+        const c = Number(code);
+        if (c === 0) t = isDay ? palettes.dayClear : palettes.night;
+        else if ([1,2,3,45,48].includes(c)) t = isDay ? palettes.cloudy : palettes.night;
+        else if ([61,63,65,80,81,82,51,53,55,56,57,66,67].includes(c)) t = palettes.rain;
+        else if ([71,73,75,77,85,86].includes(c)) t = palettes.snow;
+        else if ([95,96,99].includes(c)) t = palettes.storm;
+        return t;
+      }
+
+      function applyTheme(code, isDay) {
+        // themeMode: 'auto' -> use weather palette; 'dark' -> force night; 'light' -> force light
+        document.body.classList.toggle('theme-dark', themeMode === 'dark');
+        if (themeMode === 'dark') {
+          setThemeByPalette({ from: '#0f172a', to: '#1f2937', text: '#f8fafc' });
+        } else if (themeMode === 'light') {
+          const p = getPalette(code, true /*always light */);
+          setThemeByPalette(p);
+        } else {
+          const p = getPalette(code, isDay);
+          setThemeByPalette(p);
+          // when auto and it's night palette, body.theme-dark styles will harmonize
+          document.body.classList.toggle('theme-dark', p.text === '#f8fafc');
+        }
+      }
+
+      function updateThemeButton() {
+        if (themeMode === 'auto') elTheme.textContent = '🌓 Auto';
+        else if (themeMode === 'dark') elTheme.textContent = '🌙 Dark';
+        else elTheme.textContent = '☀️ Light';
+        elTheme.setAttribute('aria-label', `Theme: ${themeMode}`);
+      }
+
+      function toDeg(val) {
+        const n = Number(val);
+        if (!isFinite(n)) return '--';
+        return ((n % 360) + 360) % 360;
+      }
+
+      // API calls
+      async function geocodeSearch(query, signal) {
+        const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
+        url.searchParams.set('name', query);
+        url.searchParams.set('count', '8');
+        url.searchParams.set('language', 'en');
+        url.searchParams.set('format', 'json');
+        const res = await fetch(url.toString(), { signal });
+        if (!res.ok) throw new Error('Geocoding failed');
+        const data = await res.json();
+        return (data?.results ?? []).map(g => ({
+          id: g.id ?? 0,
+          name: g.name,
+          lat: g.latitude,
+          lon: g.longitude,
+          admin1: g.admin1,
+          country: g.country,
+          timezone: g.timezone
+        }));
+      }
+
+      async function reverseGeocode(lat, lon) {
+        const url = new URL('https://geocoding-api.open-meteo.com/v1/reverse');
+        url.searchParams.set('latitude', lat);
+        url.searchParams.set('longitude', lon);
+        url.searchParams.set('language', 'en');
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('count', '1');
+        const res = await fetch(url.toString());
+        if (!res.ok) return null;
+        const data = await res.json();
+        const g = data?.results?.[0];
+        if (!g) return null;
+        return {
+          name: g.name,
+          subtitle: [g.admin1, g.country].filter(Boolean).join(', '),
+          timezone: g.timezone
+        };
+      }
+
+      async function fetchWeather(lat, lon, unit) {
+        const isF = unit === 'f';
+        const url = new URL('https://api.open-meteo.com/v1/forecast');
+        url.searchParams.set('latitude', lat);
+        url.searchParams.set('longitude', lon);
+        url.searchParams.set('current', [
+          'temperature_2m',
+          'apparent_temperature',
+          'is_day',
+          'precipitation',
+          'weather_code',
+          'wind_speed_10m',
+          'wind_direction_10m',
+          'relative_humidity_2m',
+          'pressure_msl'
+        ].join(','));
+        url.searchParams.set('temperature_unit', isF ? 'fahrenheit' : 'celsius');
+        url.searchParams.set('wind_speed_unit', isF ? 'mph' : 'kmh');
+        url.searchParams.set('precipitation_unit', 'mm');
+        url.searchParams.set('timezone', 'auto');
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error('Weather fetch failed');
+        return await res.json();
+      }
+
+      // UI helpers
+      function showLoading() {
+        elPlaceholder.hidden = true;
+        elWeather.hidden = true;
+        elLoading.hidden = false;
+      }
+      function showPlaceholder() {
+        elPlaceholder.hidden = false;
+        elWeather.hidden = true;
+        elLoading.hidden = true;
+      }
+      function hideLoading() {
+        elLoading.hidden = true;
+        elWeather.hidden = false;
+      }
+
+      function showSuggLoading() {
+        elSugg.innerHTML = `<div class="item muted" role="status">Searching...</div>`;
+        elSugg.classList.add('open');
+        highlightedIndex = -1;
+      }
+      function showSuggEmpty() {
+        elSugg.innerHTML = `<div class="item muted" role="status">No results</div>`;
+        elSugg.classList.add('open');
+        highlightedIndex = -1;
+      }
+
+      function renderSuggestions(items) {
+        const open = items && items.length > 0;
+        elSugg.innerHTML = '';
+        elSugg.classList.toggle('open', open);
+        highlightedIndex = -1;
+        if (!open) return;
+
+        const frag = document.createDocumentFragment();
+        items.forEach((s, idx) => {
+          const btn = document.createElement('div');
+          btn.className = 'item';
+          btn.setAttribute('role', 'option');
+          btn.setAttribute('aria-selected', 'false');
+          btn.tabIndex = -1;
+          btn.innerHTML = `
+            <span class="loc-pin" aria-hidden="true">📍</span>
+            <div style="display:flex; flex-direction:column;">
+              <span style="font-weight:600">${escapeHtml(s.name)}</span>
+              <span class="muted" style="font-size:12px;">${escapeHtml([s.admin1, s.country].filter(Boolean).join(', '))}</span>
+            </div>
+          `;
+          btn.addEventListener('mousedown', (e) => { // mousedown to fire before input blur
+            e.preventDefault();
+            pickSuggestion(idx);
+          });
+          frag.appendChild(btn);
+        });
+        elSugg.appendChild(frag);
+      }
+
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+      }
+
+      function pickSuggestion(idx) {
+        const s = suggestions[idx];
+        if (!s) return;
+        const subtitle = [s.admin1, s.country].filter(Boolean).join(', ');
+        elSearch.value = `${s.name}${subtitle ? ', ' + subtitle : ''}`;
+        elSugg.classList.remove('open');
+        highlightedIndex = -1;
+        currentCoords = { lat: s.lat, lon: s.lon, name: s.name, subtitle, timezone: s.timezone };
+        queryWeatherCurrent();
+      }
+
+      const debouncedSearch = debounce(async () => {
+        const q = elSearch.value.trim();
+        if (q.length < 2) { suggestions = []; elSugg.classList.remove('open'); return; }
+        try {
+          // Abort previous search if any
+          if (searchController) searchController.abort();
+          searchController = ('AbortController' in window) ? new AbortController() : null;
+          const signal = searchController ? searchController.signal : undefined;
+
+          showSuggLoading();
+          const items = await geocodeSearch(q, signal);
+          suggestions = items;
+          if (items.length === 0) showSuggEmpty();
+          else renderSuggestions(items);
+        } catch (e) {
+          if (e && e.name === 'AbortError') return; // ignore aborted
+          suggestions = [];
+          showSuggEmpty();
+        }
+      }, 300);
+
+      function updateUnitButtons() {
+        const isC = unit === 'c';
+        elC.classList.toggle('btn-active', isC);
+        elC.setAttribute('aria-pressed', String(isC));
+        elF.classList.toggle('btn-active', !isC);
+        elF.setAttribute('aria-pressed', String(!isC));
+        elUnit.textContent = isC ? '°C' : '°F';
+      }
+
+      async function queryWeatherCurrent() {
+        if (!currentCoords) return;
+        try {
+          showLoading();
+          const data = await fetchWeather(currentCoords.lat, currentCoords.lon, unit);
+          const cur = data.current || {};
+          // Set theme
+          applyTheme(cur.weather_code ?? 0, (cur.is_day ?? 1) === 1);
+
+          // Update text
+          elLoc.textContent = currentCoords.name || (data.timezone ?? 'Location');
+          elSub.textContent = currentCoords.subtitle || (currentCoords.timezone || data.timezone || '');
+          elTemp.textContent = Math.round(Number(cur.temperature_2m ?? 0));
+          elDesc.textContent = codeToText(cur.weather_code);
+          elCoords.textContent = `${Number(currentCoords.lat).toFixed(2)}, ${Number(currentCoords.lon).toFixed(2)}`;
+          elFeels.textContent = `${Math.round(Number(cur.apparent_temperature ?? 0))} ${unit === 'c' ? '°C' : '°F'}`;
+          elHumidity.textContent = (cur.relative_humidity_2m != null)
+            ? `${Math.round(Number(cur.relative_humidity_2m))} %` : '—';
+          elWind.textContent = `${Math.round(Number(cur.wind_speed_10m ?? 0))} ${unit === 'f' ? 'mph' : 'km/h'}`;
+          elWindDir.textContent = `${toDeg(cur.wind_direction_10m)}°`;
+          elPressure.textContent = (cur.pressure_msl != null)
+            ? `${Math.round(Number(cur.pressure_msl))} hPa` : '—';
+          elPrecip.textContent = (cur.precipitation != null)
+            ? `${Number(cur.precipitation).toFixed(1)} mm` : '—';
+
+          hideLoading();
+        } catch (e) {
+          console.error(e);
+          alert('Failed to load weather. Please try again.');
+          showPlaceholder();
+        }
+      }
+
+      // Events
+      elSearch.addEventListener('input', () => {
+        debouncedSearch();
+      });
+      elSearch.addEventListener('focus', () => {
+        if (suggestions.length > 0) elSugg.classList.add('open');
+      });
+      elSearch.addEventListener('blur', () => {
+        // delay to allow click selection
+        setTimeout(() => elSugg.classList.remove('open'), 120);
+      });
+      elSearch.addEventListener('keydown', (e) => {
+        const hasOpen = elSugg.classList.contains('open') && suggestions.length > 0;
+        if (!hasOpen && e.key === 'Enter') {
+          const q = elSearch.value.trim();
+          if (q.length >= 2) {
+            (async () => {
+              try {
+                // Ensure we fetch if there isn't a list yet
+                const items = await geocodeSearch(q);
+                suggestions = items;
+                if (items[0]) pickSuggestion(0);
+                else showSuggEmpty();
+              } catch {
+                showSuggEmpty();
+              }
+            })();
+            e.preventDefault();
+          }
+          return;
+        }
+        if (!hasOpen) return;
+
+        if (e.key === 'ArrowDown') {
+          highlightedIndex = (highlightedIndex + 1) % suggestions.length;
+          updateHighlighted();
+          e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+          highlightedIndex = (highlightedIndex - 1 + suggestions.length) % suggestions.length;
+          updateHighlighted();
+          e.preventDefault();
+        } else if (e.key === 'Enter') {
+          if (highlightedIndex >= 0) {
+            pickSuggestion(highlightedIndex);
+            e.preventDefault();
+          } else if (suggestions[0]) {
+            pickSuggestion(0);
+            e.preventDefault();
+          }
+        } else if (e.key === 'Escape') {
+          elSugg.classList.remove('open');
+          highlightedIndex = -1;
+        }
+      });
+
+      function updateHighlighted() {
+        const nodes = Array.from(elSugg.querySelectorAll('.item'));
+        nodes.forEach((n, i) => n.setAttribute('aria-selected', String(i === highlightedIndex)));
+        if (nodes[highlightedIndex]) {
+          nodes[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        }
+      }
+
+      elClear.addEventListener('click', () => {
+        elSearch.value = '';
+        suggestions = [];
+        elSugg.classList.remove('open');
+        elSearch.focus();
+      });
+
+      elGo.addEventListener('click', () => {
+        if (suggestions[0]) {
+          pickSuggestion(0);
+        } else {
+          const q = elSearch.value.trim();
+          if (q.length >= 2) {
+            (async () => {
+              try {
+                const items = await geocodeSearch(q);
+                suggestions = items;
+                if (items[0]) pickSuggestion(0);
+                else alert('No matching city found.');
+              } catch {
+                alert('Search failed. Check your connection.');
+              }
+            })();
+          }
+        }
+      });
+
+      elC.addEventListener('click', () => {
+        unit = 'c'; updateUnitButtons(); queryWeatherCurrent();
+      });
+      elF.addEventListener('click', () => {
+        unit = 'f'; updateUnitButtons(); queryWeatherCurrent();
+      });
+
+      elTheme.addEventListener('click', () => {
+        themeMode = themeMode === 'auto' ? 'dark' : themeMode === 'dark' ? 'light' : 'auto';
+        localStorage.setItem('weather_theme_mode', themeMode);
+        updateThemeButton();
+        // Re-apply theme using last known weather or default
+        applyTheme(lastWeatherCode ?? 0, lastIsDay ?? true);
+      });
+
+      elLocate.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          alert('Geolocation is not supported by your browser.');
+          return;
+        }
+        elLocate.disabled = true;
+        elLocate.textContent = '📍 Locating...';
+        showLoading();
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          let meta = null;
+          try { meta = await reverseGeocode(lat, lon); } catch {}
+          currentCoords = {
+            lat, lon,
+            name: meta?.name || 'Current Location',
+            subtitle: meta?.subtitle || '',
+            timezone: meta?.timezone || ''
+          };
+          elSearch.value = currentCoords.name + (currentCoords.subtitle ? ', ' + currentCoords.subtitle : '');
+          await queryWeatherCurrent();
+          elLocate.disabled = false;
+          elLocate.textContent = '📍 My location';
+        }, (err) => {
+          console.error(err);
+          elLocate.disabled = false;
+          elLocate.textContent = '📍 My location';
+          showPlaceholder();
+          alert('Unable to retrieve your location.');
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+      });
+
+      // Track last theme-relevant info to re-apply on theme toggle
+      let lastWeatherCode = 0;
+      let lastIsDay = true;
+
+      // Monkey-patch applyTheme to remember last code/isDay
+      const _applyTheme = applyTheme;
+      applyTheme = function(code, isDay) {
+        lastWeatherCode = Number(code) || 0;
+        lastIsDay = !!isDay;
+        _applyTheme(lastWeatherCode, lastIsDay);
+      };
+
+      // Init
+      updateUnitButtons();
+      updateThemeButton();
+      // If user prefers dark and themeMode is auto, reflect it initially
+      if (themeMode === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('theme-dark');
+      }
+      showPlaceholder();
+      // Ensure suggestions container stacks above content
+      document.querySelector('.field').style.zIndex = 10;
+    </script>
+  </body>
+</html>
